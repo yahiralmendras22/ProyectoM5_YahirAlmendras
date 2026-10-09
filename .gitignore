@@ -1,0 +1,22 @@
+# Dependencias
+node_modules/
+
+# Build
+dist/
+
+# Variables de entorno: NUNCA commitear el token de GitHub
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
