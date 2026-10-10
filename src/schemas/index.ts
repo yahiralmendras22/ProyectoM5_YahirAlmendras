@@ -1,5 +1,27 @@
 import * as z from "zod";
 
+// ---------- Campos reutilizables ----------
+
+export const ownerSchema = z
+  .string()
+  .trim()
+  .min(1, "El dueño del repositorio no puede estar vacío.")
+  .max(39, "Un usuario u organización de GitHub tiene como máximo 39 caracteres.")
+  .regex(/^[a-zA-Z0-9-]+$/, {
+    message: "El dueño solo puede contener letras, números y guiones medios.",
+  })
+  .describe("Usuario u organización dueña del repositorio (ej: 'yahiralmendras22')");
+
+export const repoNameSchema = z
+  .string()
+  .trim()
+  .min(3, "El nombre del repositorio debe tener al menos 3 caracteres.")
+  .max(100, "El nombre del repositorio puede tener como máximo 100 caracteres.")
+  .regex(/^[a-zA-Z0-9_.-]+$/, {
+    message:
+      "El nombre solo puede contener letras, números, guiones bajos, puntos y guiones medios. Sin espacios.",
+  });
+
 // ---------- Repositorio (forma que devolvemos al LLM) ----------
 
 export const RepositorySchema = z.object({
@@ -15,17 +37,9 @@ export type Repository = z.infer<typeof RepositorySchema>;
 // ---------- create_repository ----------
 
 export const createRepositorySchema = z.object({
-  name: z
-    .string()
-    .min(3, "El nombre del repositorio debe tener al menos 3 caracteres.")
-    .max(100, "El nombre del repositorio puede tener como máximo 100 caracteres.")
-    .regex(/^[a-zA-Z0-9_.-]+$/, {
-      message:
-        "El nombre solo puede contener letras, números, guiones bajos, puntos y guiones medios. Sin espacios.",
-    })
-    .describe(
-      "Nombre del repositorio (sin espacios, solo letras, números, '_', '.' y '-'; mínimo 3 y máximo 100 caracteres)",
-    ),
+  name: repoNameSchema.describe(
+    "Nombre del repositorio nuevo (sin espacios, solo letras, números, '_', '.' y '-'; mínimo 3 y máximo 100 caracteres)",
+  ),
   description: z
     .string()
     .max(350, "La descripción puede tener como máximo 350 caracteres.")
