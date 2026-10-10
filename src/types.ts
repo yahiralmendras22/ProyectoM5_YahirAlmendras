@@ -1,13 +1,3 @@
-export interface RepositorySummary {
-  name: string;
-  fullName: string;
-  description: string | null;
-  private: boolean;
-  url: string;
-  defaultBranch: string;
-  updatedAt: string | null;
-}
-
 export interface IssueSummary {
   number: number;
   title: string;
