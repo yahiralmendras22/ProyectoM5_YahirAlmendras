@@ -26,7 +26,7 @@ export function registerListRepositories(server: McpServer, client: GitHubClient
       annotations: { readOnlyHint: true },
     },
 
-    // 3. Handler: lo que se ejecuta cuando el LLM la llama
+    // 3. Handler: lo que se ejecuta cuando el LLM lo llama
     async (input) => {
       logger.info("Ejecutando list_repositories", { input });
 
