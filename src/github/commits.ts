@@ -1,9 +1,6 @@
 import type { GitHubClient } from "./client.js";
+import { getHttpStatus, ValidationError } from "../errors/index.js";
 import type { Commit, CreateCommitInput } from "../schemas/index.js";
-
-function isNotFoundError(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "status" in error && error.status === 404;
-}
 
 /**
  * Devuelve el SHA del archivo si ya existe, o undefined si no existe.
@@ -21,11 +18,11 @@ async function getFileSha(
       ref: input.branch,
     });
     if (Array.isArray(data) || data.type !== "file") {
-      throw new Error(`La ruta "${input.path}" no es un archivo (es una carpeta u otro tipo de elemento).`);
+      throw new ValidationError(`La ruta "${input.path}" no es un archivo (es una carpeta u otro tipo de elemento).`);
     }
     return data.sha;
   } catch (error) {
-    if (isNotFoundError(error)) return undefined;
+    if (getHttpStatus(error) === 404) return undefined;
     throw error;
   }
 }
