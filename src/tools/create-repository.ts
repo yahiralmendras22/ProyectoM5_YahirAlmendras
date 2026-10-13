@@ -6,6 +6,8 @@ import {
   createRepositorySchema,
 } from "../schemas/index.js";
 import { logger } from "../helpers/logging.js";
+import { withRetry } from "../helpers/retry.js";
+import { toolError, toolSuccess } from "../helpers/tool-result.js";
 
 export function registerCreateRepository(server: McpServer, client: GitHubClient): void {
   server.registerTool(
@@ -26,24 +28,16 @@ export function registerCreateRepository(server: McpServer, client: GitHubClient
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
 
-    // 3. Handler: lo que se ejecuta cuando el LLM lo llama
+    // 3. Handler: lo que se ejecuta cuando el LLM la llama
     async (input) => {
       logger.info("Ejecutando create_repository", { name: input.name, private: input.private });
+      const context = { action: `crear el repositorio "${input.name}"` };
 
       try {
-        const repository = await createRepository(client, input);
-        const result = { ok: true as const, data: repository };
-
-        return {
-          structuredContent: result,
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-        };
+        const repository = await withRetry(() => createRepository(client, input), context);
+        return toolSuccess(repository);
       } catch (error) {
-        logger.error("create_repository falló", { error });
-        return {
-          isError: true,
-          content: [{ type: "text", text: `No se pudo crear el repositorio "${input.name}" en GitHub.` }],
-        };
+        return toolError(error, context);
       }
     },
   );

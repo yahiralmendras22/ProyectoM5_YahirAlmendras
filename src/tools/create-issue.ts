@@ -3,6 +3,8 @@ import type { GitHubClient } from "../github/client.js";
 import { createIssue } from "../github/operations.js";
 import { createIssueOutputSchema, createIssueSchema } from "../schemas/index.js";
 import { logger } from "../helpers/logging.js";
+import { withRetry } from "../helpers/retry.js";
+import { toolError, toolSuccess } from "../helpers/tool-result.js";
 
 export function registerCreateIssue(server: McpServer, client: GitHubClient): void {
   server.registerTool(
@@ -23,26 +25,19 @@ export function registerCreateIssue(server: McpServer, client: GitHubClient): vo
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
 
-    // 3. Handler: lo que se ejecuta cuando el LLM lo llama
+    // 3. Handler: lo que se ejecuta cuando el LLM la llama
     async (input) => {
       logger.info("Ejecutando create_issue", { owner: input.owner, repo: input.repo, title: input.title });
+      const context = {
+        action: "crear el issue",
+        resource: `El repositorio "${input.owner}/${input.repo}"`,
+      };
 
       try {
-        const issue = await createIssue(client, input);
-        const result = { ok: true as const, data: issue };
-
-        return {
-          structuredContent: result,
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-        };
+        const issue = await withRetry(() => createIssue(client, input), context);
+        return toolSuccess(issue);
       } catch (error) {
-        logger.error("create_issue falló", { error });
-        return {
-          isError: true,
-          content: [
-            { type: "text", text: `No se pudo crear el issue en el repositorio "${input.owner}/${input.repo}".` },
-          ],
-        };
+        return toolError(error, context);
       }
     },
   );

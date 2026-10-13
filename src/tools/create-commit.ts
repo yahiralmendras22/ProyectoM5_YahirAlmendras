@@ -3,6 +3,8 @@ import type { GitHubClient } from "../github/client.js";
 import { createCommit } from "../github/operations.js";
 import { createCommitOutputSchema, createCommitSchema } from "../schemas/index.js";
 import { logger } from "../helpers/logging.js";
+import { withRetry } from "../helpers/retry.js";
+import { toolError, toolSuccess } from "../helpers/tool-result.js";
 
 export function registerCreateCommit(server: McpServer, client: GitHubClient): void {
   server.registerTool(
@@ -25,7 +27,7 @@ export function registerCreateCommit(server: McpServer, client: GitHubClient): v
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     },
 
-    // 3. Handler: lo que se ejecuta cuando el LLM lo llama
+    // 3. Handler: lo que se ejecuta cuando el LLM la llama
     async (input) => {
       logger.info("Ejecutando create_commit", {
         owner: input.owner,
@@ -34,26 +36,16 @@ export function registerCreateCommit(server: McpServer, client: GitHubClient): v
         branch: input.branch ?? "(rama por defecto)",
         contentLength: input.content.length,
       });
+      const context = {
+        action: `hacer el commit de "${input.path}"`,
+        resource: `El repositorio "${input.owner}/${input.repo}"`,
+      };
 
       try {
-        const commit = await createCommit(client, input);
-        const result = { ok: true as const, data: commit };
-
-        return {
-          structuredContent: result,
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-        };
+        const commit = await withRetry(() => createCommit(client, input), context);
+        return toolSuccess(commit);
       } catch (error) {
-        logger.error("create_commit falló", { error });
-        return {
-          isError: true,
-          content: [
-            {
-              type: "text",
-              text: `No se pudo hacer el commit del archivo "${input.path}" en "${input.owner}/${input.repo}".`,
-            },
-          ],
-        };
+        return toolError(error, context);
       }
     },
   );

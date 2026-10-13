@@ -3,6 +3,8 @@ import type { GitHubClient } from "../github/client.js";
 import { listIssues } from "../github/operations.js";
 import { listIssuesOutputSchema, listIssuesSchema } from "../schemas/index.js";
 import { logger } from "../helpers/logging.js";
+import { withRetry } from "../helpers/retry.js";
+import { toolError, toolSuccess } from "../helpers/tool-result.js";
 
 export function registerListIssues(server: McpServer, client: GitHubClient): void {
   server.registerTool(
@@ -22,26 +24,19 @@ export function registerListIssues(server: McpServer, client: GitHubClient): voi
       annotations: { readOnlyHint: true },
     },
 
-    // 3. Handler: lo que se ejecuta cuando el LLM lo llama
+    // 3. Handler: lo que se ejecuta cuando el LLM la llama
     async (input) => {
       logger.info("Ejecutando list_issues", { input });
+      const context = {
+        action: "listar los issues",
+        resource: `El repositorio "${input.owner}/${input.repo}"`,
+      };
 
       try {
-        const issues = await listIssues(client, input);
-        const result = { ok: true as const, data: issues };
-
-        return {
-          structuredContent: result,
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-        };
+        const issues = await withRetry(() => listIssues(client, input), context);
+        return toolSuccess(issues);
       } catch (error) {
-        logger.error("list_issues falló", { error });
-        return {
-          isError: true,
-          content: [
-            { type: "text", text: `No se pudieron obtener los issues del repositorio "${input.owner}/${input.repo}".` },
-          ],
-        };
+        return toolError(error, context);
       }
     },
   );

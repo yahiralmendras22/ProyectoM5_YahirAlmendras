@@ -1,11 +1,10 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { GitHubClient } from "../github/client.js";
 import { listRepositories } from "../github/operations.js";
-import {
-  listRepositoriesOutputSchema,
-  listRepositoriesSchema,
-} from "../schemas/index.js";
+import { listRepositoriesOutputSchema, listRepositoriesSchema } from "../schemas/index.js";
 import { logger } from "../helpers/logging.js";
+import { withRetry } from "../helpers/retry.js";
+import { toolError, toolSuccess } from "../helpers/tool-result.js";
 
 export function registerListRepositories(server: McpServer, client: GitHubClient): void {
   server.registerTool(
@@ -26,24 +25,16 @@ export function registerListRepositories(server: McpServer, client: GitHubClient
       annotations: { readOnlyHint: true },
     },
 
-    // 3. Handler: lo que se ejecuta cuando el LLM lo llama
+    // 3. Handler: lo que se ejecuta cuando el LLM la llama
     async (input) => {
       logger.info("Ejecutando list_repositories", { input });
+      const context = { action: "listar tus repositorios" };
 
       try {
-        const repositories = await listRepositories(client, input);
-        const result = { ok: true as const, data: repositories };
-
-        return {
-          structuredContent: result,
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-        };
+        const repositories = await withRetry(() => listRepositories(client, input), context);
+        return toolSuccess(repositories);
       } catch (error) {
-        logger.error("list_repositories falló", { error });
-        return {
-          isError: true,
-          content: [{ type: "text", text: "No se pudieron obtener los repositorios de GitHub." }],
-        };
+        return toolError(error, context);
       }
     },
   );
